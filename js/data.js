@@ -148,6 +148,8 @@
   add('book_cooking', 'Campfire Cooking', 'misc', 1, 1, 0.5, { book: { skill: 'cook', xp: 80, learn: [], txt: 'Heat is a tool.' }, ic: ['book', '#c88a2a', '#d8d8c8'] });
   // CLOTHING  slot, warm(degC), prot(0..1), rain(0..1), cap [[w,h]], cb extra kg
   add('cap', 'Baseball Cap', 'cloth', 1, 1, 0.1, { slot: 'head', warm: 0.5, prot: 0.02, ic: ['hat', '#3a4a6a', '#2a3450'] });
+  add('gloves', 'Work Gloves', 'cloth', 1, 1, 0.2, { slot: 'hands', warm: 1.5, prot: 0.04, ic: ['glove', '#9a7a44', '#6a5230'] });
+  add('scarf', 'Wool Scarf', 'cloth', 1, 1, 0.15, { slot: 'neck', warm: 1.8, prot: 0.02, ic: ['scarf', '#7a3a3a', '#a85a4a'] });
   add('beanie', 'Wool Beanie', 'cloth', 1, 1, 0.1, { slot: 'head', warm: 2, prot: 0.02, ic: ['hat', '#6a3a32', '#4a2822'] });
   add('hardhat', 'Hard Hat', 'cloth', 1, 1, 0.5, { slot: 'head', warm: 0.5, prot: 0.15, ic: ['hat', '#d8a82c', '#a07818'] });
   add('tshirt', 'T-Shirt', 'cloth', 2, 2, 0.2, { slot: 'body', warm: 1, prot: 0.02, ic: ['shirt', '#6a7a6a', '#4a5a4a'] });
@@ -167,10 +169,10 @@
   const L = (DC.LOOT = {
     kitchen: [['beans', 8], ['soup', 6], ['chips', 6], ['bread', 4], ['cereal', 4], ['peaches', 4], ['soda', 4], ['knife', 2], ['pan', 2], ['matches', 2], ['pot', 1.5], ['rag', 2], ['bottle_empty', 3], ['water_clean', 3], ['jerky', 2], ['petfood', 1.5]],
     fridge: [['sandwich', 6], ['egg', 6], ['apple', 5], ['soda', 5], ['carrot', 3], ['bread', 3], ['water_clean', 3], ['choc', 3], ['jerky', 2]],
-    bedroom: [['sheet', 6], ['tshirt', 4], ['hoodie', 2.5], ['jeans', 3], ['jacket', 1.5], ['sneakers', 2.5], ['cap', 2], ['beanie', 2], ['alarm_clock', 3], ['cash', 4], ['flashlight', 2], ['battery', 3], ['backpack_school', 1.4], ['painkillers', 1.5], ['book_survival', 0.6], ['note', 2], ['rag', 2]],
+    bedroom: [['scarf', 1.5], ['gloves', 1.2], ['sheet', 6], ['tshirt', 4], ['hoodie', 2.5], ['jeans', 3], ['jacket', 1.5], ['sneakers', 2.5], ['cap', 2], ['beanie', 2], ['alarm_clock', 3], ['cash', 4], ['flashlight', 2], ['battery', 3], ['backpack_school', 1.4], ['painkillers', 1.5], ['book_survival', 0.6], ['note', 2], ['rag', 2]],
     living: [['newspaper', 6], ['battery', 3], ['lighter', 3], ['cash', 3], ['radio', 1.2], ['sheet', 3], ['book_cooking', 0.8], ['book_firstaid', 0.8], ['note', 3], ['map', 0.8], ['matches', 3]],
     bath: [['painkillers', 4], ['bandage', 5], ['antiseptic', 3], ['rag', 3], ['water_tabs', 1], ['bottle_empty', 2]],
-    garage: [['hammer', 4], ['screwdriver', 4], ['nails', 8], ['plank', 5], ['saw', 2], ['crowbar', 2], ['scrap', 5], ['rope', 3], ['duct_tape', 3], ['battery', 3], ['hatchet', 1.5], ['jerry_empty', 2], ['wire', 3], ['bat', 2], ['pipe', 3], ['shovel', 1.5], ['flashlight', 2], ['tarp', 2], ['cargo', 1], ['boots', 1.5], ['book_carpentry', 0.7]],
+    garage: [['gloves', 2.5], ['hammer', 4], ['screwdriver', 4], ['nails', 8], ['plank', 5], ['saw', 2], ['crowbar', 2], ['scrap', 5], ['rope', 3], ['duct_tape', 3], ['battery', 3], ['hatchet', 1.5], ['jerry_empty', 2], ['wire', 3], ['bat', 2], ['pipe', 3], ['shovel', 1.5], ['flashlight', 2], ['tarp', 2], ['cargo', 1], ['boots', 1.5], ['book_carpentry', 0.7]],
     desk: [['cash', 4], ['battery', 3], ['note', 4], ['newspaper', 2], ['circuit', 1.5], ['pins', 2], ['screwdriver', 1.5], ['map', 1], ['lighter', 2]],
     dumpster: [['rag', 4], ['scrap', 3], ['bottle_empty', 5], ['can_empty', 6], ['newspaper', 4], ['chips', 1], ['stick', 2], ['wire', 2], ['sheet', 1]],
     locker: [['sneakers', 3], ['tshirt', 4], ['backpack_school', 2], ['duffel', 1], ['cap', 3], ['water_clean', 3], ['jeans', 3], ['hoodie', 2], ['choc', 2], ['battery', 2], ['pins', 1]],
@@ -267,8 +269,11 @@
     nightmare: { name: 'Last Light', zombies: 2, loot: 0.5, weather: 1.8, dayLen: 14, needs: 1.6, powerDay: 2, waterDay: 2 },
   };
   DC.DEFAULT_SETTINGS = {
-    music: 0.45, sfx: 0.8, mute: false, gore: true, debug: false, zoom: 0, pauseInv: true, holdToggle: false, aimAssist: true,
+    music: 0.45, sfx: 0.8, mute: false, gore: true, overlay: false, zoom: 0, pauseInv: true, holdToggle: false, aimAssist: true,
     noiseRing: true, shadows: true, showTouch: false, hints: true, seen: {}, ctl: {},
+    gfx: 'auto', autoQuality: true, redParticles: false, redShadows: false, redLight: false, redWeather: false, redShake: false, reduceMotion: false, postfx: true, grain: true, zoomMul: 1,
+    master: 1, amb: 0.7, uivol: 0.6, lowPowerAudio: false, haptics: true,
+    hudCompact: false, hiContrast: false, colorBlind: false, bigText: false, hudRight: false, ctlOpacity: 0.85, hideBtn: {}, leftHand: false, compass: true,
   };
 
   // NPC / animal / lore

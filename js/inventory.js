@@ -1,4 +1,4 @@
-/* Dead County: Last Light - grid inventory, items, containers, loot generation. */
+/* Dead County: Last Light - grid inventory, items, containers, loot tables. */
 (function () {
   'use strict';
   const DC = window.DC, I = DC.ITEMS, W = DC.W;

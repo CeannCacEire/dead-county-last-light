@@ -3,7 +3,26 @@
   'use strict';
   const DC = window.DC, UI = DC.UI, h = UI.h, I = DC.ITEMS, W = DC.W, T = 16, N = W.N;
   const CAT = { food: 'Food', water: 'Water', med: 'Medicine', tool: 'Tools', weapon: 'Weapons', ammo: 'Ammunition', cloth: 'Clothing', build: 'Building materials', elec: 'Electronics', misc: 'Miscellaneous' };
-  const SLOTS = [['head', 'Head'], ['body', 'Body'], ['legs', 'Legs'], ['feet', 'Feet'], ['back', 'Back'], ['hand', 'Hands']];
+  const SLOTS = [['head', 'Head'], ['neck', 'Neck'], ['body', 'Body'], ['hands', 'Gloves'], ['legs', 'Legs'], ['feet', 'Feet'], ['back', 'Back'], ['hand', 'Held']];
+  const flt = { q: '', cat: '', sort: 'name' };
+  const SORTS = [['name', 'Name'], ['cat', 'Category'], ['wt', 'Weight'], ['cond', 'Condition']];
+  const match = (it) => (!flt.cat || I[it.id].cat === flt.cat) && (!flt.q || DC.itemName(it).toLowerCase().includes(flt.q));
+  const condOf = (it) => { const md = DC.maxDur(it); return md && it.d !== undefined ? it.d / md : 1; };
+  function sortGrid(grid) {
+    const old = grid.items.map((it) => [it, it.x, it.y, it.r]), items = grid.items.slice();
+    const key = { name: (a, b) => DC.itemName(a).localeCompare(DC.itemName(b)), cat: (a, b) => I[a.id].cat.localeCompare(I[b.id].cat) || DC.itemName(a).localeCompare(DC.itemName(b)), wt: (a, b) => I[b.id].wt * b.q - I[a.id].wt * a.q, cond: (a, b) => condOf(a) - condOf(b) }[flt.sort];
+    items.sort((a, b) => (I[b.id].w * I[b.id].h) - (I[a.id].w * I[a.id].h) || key(a, b));
+    items.sort(key); grid.items.length = 0; let ok = true;
+    for (const it of items) { const sp = grid.findSpot(it); if (!sp) { ok = false; break; } grid.place(it, sp.x, sp.y, sp.r); }
+    if (!ok) { grid.items.length = 0; old.forEach(([it, x, y, r]) => grid.place(it, x, y, r)); DC.log('Could not rearrange that bag.', 'warn'); }
+  }
+  let drag = null;
+  function splitStack(it, grid) {
+    if (!(it.q > 1) || !grid) return false;
+    const half = Math.floor(it.q / 2), n = DC.makeItem(it.id, half); n.fr = it.fr; n.age = it.age; n.at = it.at; if (it.d !== undefined) n.d = it.d;
+    const sp = grid.findSpot(n); if (!sp) { DC.log('No room to split.', 'warn'); return false; }
+    it.q -= half; grid.place(n, sp.x, sp.y, sp.r); DC.audio.sfx('invmove'); DC.gfx.vibrate(18); DC.emit('inv'); return true;
+  }
   let sel = null, cmpMode = false, cmp = null;   // sel: {it, grid|null, slot|null}
 
   function gridOf(it) { for (const b of DC.bags()) if (b.grid.items.includes(it)) return b.grid; return null; }
@@ -19,11 +38,22 @@
 
   function mkGrid(grid, info, cell, loot, e) {
     const g = h('div', { class: 'igrid', style: 'grid-template-columns:repeat(' + grid.w + ',var(--cell));' });
-    for (let y = 0; y < grid.h; y++) for (let x = 0; x < grid.w; x++) g.append(h('div', { class: 'c', onclick: () => placeAt(grid, info, x, y, loot, e) }));
+    for (let y = 0; y < grid.h; y++) for (let x = 0; x < grid.w; x++) { const c = h('div', { class: 'c', onclick: () => placeAt(grid, info, x, y, loot, e) }); c._cell = { grid, info, x, y }; g.append(c); }
     for (const it of grid.items) {
       const d = I[it.id], w = it.r ? d.h : d.w, hh = it.r ? d.w : d.h;
-      const el = h('div', { class: 'it' + (sel && sel.it === it ? ' sel' : '') + (cmp === it ? ' cmp' : '') + (d.sp && DC.spoil(it) >= 1 ? ' bad' : d.sp && DC.spoil(it) >= 0.7 ? ' old' : ''), style: 'left:' + it.x * cell + 'px;top:' + it.y * cell + 'px;width:' + w * cell + 'px;height:' + hh * cell + 'px', onclick: (ev) => { ev.stopPropagation(); pick(it, grid, null, e); } });
-      const ic = UI.icon(it.id); const s = Math.min(w, hh) * cell - 6; ic.style.width = ic.style.height = Math.max(16, Math.min(s, 40)) + 'px'; if (it.r && d.w !== d.h) ic.style.transform = 'rotate(90deg)';
+      const el = h('div', { class: 'it' + (sel && sel.it === it ? ' sel' : '') + (cmp === it ? ' cmp' : '') + (d.sp && DC.spoil(it) >= 1 ? ' bad' : d.sp && DC.spoil(it) >= 0.7 ? ' old' : ''), style: 'left:' + it.x * cell + 'px;top:' + it.y * cell + 'px;width:' + w * cell + 'px;height:' + hh * cell + 'px', onclick: (ev) => { ev.stopPropagation(); if (el._swallow) { el._swallow = false; return; } pick(it, grid, null, e); } });
+      if (!match(it)) el.style.opacity = '0.22';
+      // hold to split a stack; mouse users can also drag items to a new cell
+      let holdTm = null, sx = 0, sy = 0;
+      el.addEventListener('pointerdown', (ev) => {
+        sx = ev.clientX; sy = ev.clientY; clearTimeout(holdTm);
+        if (it.q > 1) holdTm = setTimeout(() => { if (splitStack(it, grid)) el._swallow = true; }, 520);
+        if (ev.pointerType === 'mouse' && ev.button === 0) drag = { it, grid, el, sx, sy, on: false };
+      });
+      el.addEventListener('pointermove', (ev) => { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) > 10) clearTimeout(holdTm); });
+      const cancelHold = () => clearTimeout(holdTm);
+      el.addEventListener('pointerup', cancelHold); el.addEventListener('pointercancel', cancelHold); el.addEventListener('pointerleave', cancelHold);
+      const ic = UI.icon(it.id); const s = Math.min(w, hh) * cell - 6; ic.style.width = ic.style.height = Math.max(16, Math.min(s, 52)) + 'px'; if (it.r && d.w !== d.h) ic.style.transform = 'rotate(90deg)';
       el.append(ic);
       if (it.q > 1) el.append(h('span', { class: 'q', text: it.q })); else if (d.uses && it.u > 0 && d.uses > 1) el.append(h('span', { class: 'q', text: it.u }));
       if (it.grids) el.append(h('span', { class: 'q', style: 'left:1px;right:auto', text: '[]' }));
@@ -47,6 +77,18 @@
     sel = { it, grid, slot: null }; DC.emit('inv');
   }
 
+  window.addEventListener('pointermove', (ev) => {
+    if (!drag || ev.pointerType !== 'mouse') return;
+    if (!drag.on && Math.hypot(ev.clientX - drag.sx, ev.clientY - drag.sy) > 8) { drag.on = true; drag.el.classList.add('drag'); }
+  });
+  window.addEventListener('pointerup', (ev) => {
+    if (!drag) return; const d = drag; drag = null; d.el.classList.remove('drag');
+    if (!d.on) return; d.el._swallow = true;
+    const t = document.elementFromPoint(ev.clientX, ev.clientY), cell = t && t.closest && (t.closest('.c') || t.closest('.it'));
+    const c = cell && (cell._cell || null); const e = UI.stack.find((q) => q.name === 'inv');
+    if (c && e) { sel = { it: d.it, grid: d.grid, slot: null }; placeAt(c.grid, c.info, c.x, c.y, e.arg && e.arg.loot, e); }
+  });
+
   // ---------- details ----------
   function statRows(it) {
     const d = I[it.id], r = [];
@@ -67,7 +109,8 @@
   function detailEl(e, loot) {
     if (!sel) return h('div', { class: 'detail dim', text: 'Tap an item to select it. Tap an empty cell to move it there. Items can be moved between your bags and the nearby container.' });
     const it = sel.it, d = I[it.id], P = DC.S.player, equipped = !!sel.slot;
-    const box = h('div', { class: 'detail' }, h('h4', { text: DC.itemName(it) + (it.q > 1 ? ' x' + it.q : '') }), h('div', { class: 'dim', text: CAT[d.cat] + '  |  ' + (d.wt * it.q).toFixed(2) + ' kg  |  ' + d.w + 'x' + d.h }), d.d ? h('p', { text: d.d }) : null);
+    const th = UI.icon(it.id); th.style.width = th.style.height = '54px'; th.className = 'th';
+    const box = h('div', { class: 'detail' }, th, h('h4', { text: DC.itemName(it) + (it.q > 1 ? ' x' + it.q : '') }), h('div', null, h('span', { class: 'stat', text: CAT[d.cat] }), h('span', { class: 'stat', text: (d.wt * it.q).toFixed(2) + ' kg' }), h('span', { class: 'stat', text: d.w + 'x' + d.h + ' cells' }), condOf(it) < 1 ? h('span', { class: 'stat ' + (condOf(it) < 0.25 ? 'bad' : 'good'), text: Math.round(condOf(it) * 100) + '% condition' }) : null), d.d ? h('p', { text: d.d }) : null, h('div', { style: 'clear:both' }));
     const rows = statRows(it), other = compareTarget(it), orows = other ? statRows(other) : null;
     if (rows.length) box.append(h('div', null, rows.map((r) => { const o = orows && orows.find((q) => q[0] === r[0]); let cls = ''; if (o && typeof r[1] === 'number' && typeof o[1] === 'number') cls = r[1] > o[1] ? 'green' : r[1] < o[1] ? 'red' : ''; else if (o && typeof r[1] === 'string' && typeof o[1] === 'string' && parseFloat(r[1]) !== parseFloat(o[1])) cls = parseFloat(r[1]) > parseFloat(o[1]) ? 'green' : 'red'; return h('div', { class: 'kv' }, h('span', { class: 'dim', text: r[0] }), h('span', null, h('b', { class: cls, text: String(r[1]) }), o ? h('span', { class: 'dim', text: '  vs ' + o[1] }) : null)); })));
     if (other) box.append(h('p', { class: 'blue', text: 'Compared with ' + I[other.id].name + (other === P.hand || Object.values(P.equip).includes(other) ? ' (equipped)' : '') }));
@@ -81,17 +124,17 @@
     if (sel.slot === 'hand') A('Put away', () => { P.hand = null; P.lightOn = false; sel = null; DC.emit('inv'); });
     if (loot && !equipped) { const inLoot = loot.grid.items.includes(it); A(inLoot ? 'Take' : 'Put in ' + loot.name.toLowerCase(), () => { const ok = inLoot ? moveToPlayer(it, loot.grid) : DC.transfer(it, sel.grid, loot.grid, { fridge: loot.fridge }); if (!ok) DC.log('No room.', 'warn'); else sel = null; DC.emit('inv'); }); }
     if (d.w !== d.h && sel.grid) A('Rotate', () => { const g = sel.grid; it.r = it.r ? 0 : 1; if (!g.canPlace(it, it.x, it.y, it)) { const sp = g.findSpot(it); if (sp) { it.x = sp.x; it.y = sp.y; it.r = sp.r; } else { it.r = it.r ? 0 : 1; DC.log('No room to rotate.', 'warn'); } } DC.emit('inv'); });
-    if (it.q > 1 && sel.grid) A('Split', () => { const half = Math.floor(it.q / 2), n = DC.makeItem(it.id, half); n.fr = it.fr; n.age = it.age; n.at = it.at; if (it.d !== undefined) n.d = it.d; const sp = sel.grid.findSpot(n); if (sp) { it.q -= half; sel.grid.place(n, sp.x, sp.y, sp.r); DC.emit('inv'); } else DC.log('No room to split.', 'warn'); });
+    if (it.q > 1 && sel.grid) A('Split (or hold item)', () => { splitStack(it, sel.grid); });
     A(cmpMode ? 'Pick item...' : 'Compare', () => { cmpMode = !cmpMode; UI.refresh(e); });
     A('Drop', () => { removeAnywhere(it, loot); dropToWorld(it); sel = null; DC.emit('inv'); }, 'dng');
     box.append(acts);
-    if (!d.stack || true) { const pin = h('div', { class: 'row', style: 'margin-top:6px' }, h('span', { class: 'dim', text: 'Pin to hotbar:' })); for (let k = 0; k < 6; k++) pin.append(UI.btn(String(k + 1), () => { P.hot = P.hot.map((u) => (u === it.uid ? null : u)); P.hot[k] = it.uid; UI.hotbarRefresh(); UI.refresh(e); }, 'sm' + (P.hot[k] === it.uid ? ' sel' : ''))); box.append(pin); }
+    if (!d.stack || true) { const pin = h('div', { class: 'row', style: 'margin-top:6px' }, h('span', { class: 'dim', text: 'Hotbar slot:' })); for (let k = 0; k < 6; k++) pin.append(UI.btn(String(k + 1), () => { P.hot = P.hot.map((u) => (u === it.uid ? null : u)); P.hot[k] = it.uid; UI.hotbarRefresh(); UI.refresh(e); }, 'sm' + (P.hot[k] === it.uid ? ' sel' : ''))); box.append(pin); }
     return box;
   }
 
   UI.register('inv', {
     pause: 'inv',
-    close() { sel = null; cmp = null; cmpMode = false; },
+    close() { sel = null; cmp = null; cmpMode = false; flt.q = ''; flt.cat = ''; },
     render(e) {
       const P = DC.S.player, loot = e.arg && e.arg.loot;
       if (sel && sel.it && !DC.allItems().includes(sel.it) && !(loot && loot.grid.items.includes(sel.it)) && !Object.values(P.equip).includes(sel.it) && P.hand !== sel.it) sel = null;
@@ -103,24 +146,28 @@
       const eq = h('div', { class: 'eqrow' }, SLOTS.map(([s, nm]) => {
         const it = s === 'hand' ? P.hand : P.equip[s];
         const el = h('div', { class: 'eq' + (it ? ' has' : '') + (sel && sel.it === it && it ? ' sel' : ''), onclick: () => { if (it) pick(it, gridOf(it), s, e); } });
-        if (it) el.append(UI.icon(it.id), h('span', { text: I[it.id].name })); else el.append(h('span', { text: nm }));
+        if (it) el.append(UI.icon(it.id), h('span', null, h('span', { class: 'slotn', text: nm }), I[it.id].name)); else el.append(h('span', { class: 'slotn', text: nm }));
         return el;
       }));
+      const tools = h('div', { class: 'tools' },
+        h('input', { type: 'search', placeholder: 'Search items', value: flt.q, oninput: (ev) => { flt.q = ev.target.value.trim().toLowerCase(); clearTimeout(e.ft); e.ft = setTimeout(() => { UI.refresh(e); const i = e.el.querySelector('input[type=search]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); } }),
+        UI.bi('sort', 'Sort: ' + SORTS.find((x) => x[0] === flt.sort)[1], () => { const k = SORTS.findIndex((x) => x[0] === flt.sort); flt.sort = SORTS[(k + 1) % SORTS.length][0]; for (const b of DC.bags()) sortGrid(b.grid); if (loot) sortGrid(loot.grid); DC.audio.sfx('invmove'); DC.emit('inv'); }, 'sm'));
+      const cats = h('div', { class: 'chips' }, [['', 'All']].concat(Object.entries(CAT)).map(([k, n]) => UI.btn(({ build: 'Materials', misc: 'Misc', ammo: 'Ammo', elec: 'Electronics' })[k] || n, () => { flt.cat = k; UI.refresh(e); }, 'sm' + (flt.cat === k ? ' sel' : ''))));
       const left = h('div', { class: 'invcol' },
         h('div', { class: 'gbox' }, h('h5', null, h('span', { text: 'Equipped' })), eq),
-        h('div', { class: 'gbox' }, h('h5', null, h('span', { text: 'Weight' }), h('span', { class: wt > cap ? 'red' : '', text: wt.toFixed(1) + ' / ' + cap.toFixed(1) + ' kg' })), h('div', { class: 'wbar' }, h('i', { style: 'width:' + pct + '%;background:' + (wt > cap ? '#c8503a' : wt > cap * 0.8 ? '#d0a040' : '#6f8f5e') }))),
-        bags.map((b) => h('div', { class: 'gbox' }, h('h5', null, h('span', { text: b.name }), h('span', { text: b.grid.w + 'x' + b.grid.h })), mkGrid(b.grid, { fridge: false }, cell, loot, e))));
+        h('div', { class: 'gbox' }, h('h5', null, h('span', { text: 'Weight' }), h('span', { class: wt > cap ? 'red' : '', text: wt.toFixed(1) + ' / ' + cap.toFixed(1) + ' kg' })), h('div', { class: 'wbar' + (wt > cap ? ' over' : '') }, h('i', { style: 'width:' + pct + '%' + (wt > cap * 0.8 && wt <= cap ? ';background:linear-gradient(180deg,#e8c070,#b88a30)' : '') })), wt > cap ? h('p', { class: 'red', text: 'Overloaded: you move slowly and make more noise.' }) : null),
+        bags.map((b) => { const used = b.grid.items.reduce((a, q) => a + I[q.id].w * I[q.id].h, 0), tot = b.grid.w * b.grid.h; return h('div', { class: 'gbox' }, h('h5', null, h('span', { text: b.name }), h('span', { class: used >= tot ? 'full' : '', text: used >= tot ? 'Full' : used + '/' + tot + ' cells' })), mkGrid(b.grid, { fridge: false }, cell, loot, e)); }));
       const nearby = h('div', { class: 'gbox' });
       if (loot) {
-        nearby.append(h('h5', null, h('span', { text: loot.name + (loot.fridge ? ' (cold)' : '') }), UI.btn('Take all', () => { for (const it of loot.grid.items.slice()) moveToPlayer(it, loot.grid); DC.emit('inv'); }, 'sm')), mkGrid(loot.grid, { fridge: loot.fridge }, cell, loot, e));
+        nearby.append(h('h5', null, h('span', { text: loot.name + (loot.fridge ? ' (cold)' : '') }), UI.bi('arrow', 'Take all', () => { for (const it of loot.grid.items.slice()) moveToPlayer(it, loot.grid); DC.emit('inv'); }, 'sm')), mkGrid(loot.grid, { fridge: loot.fridge }, cell, loot, e));
         if (!loot.grid.items.length) nearby.append(h('p', { class: 'dim', text: 'Empty.' }));
-      } else nearby.append(h('h5', null, h('span', { text: 'Nearby container' })), h('p', { class: 'dim', text: 'Search a container (hold ACT) to see its contents here.' }));
+      } else nearby.append(h('h5', null, h('span', { text: 'Nearby container' })), h('p', { class: 'dim', text: 'Search a container (hold Act) to see its contents here.' }));
       const ground = DC.groundNear(P.x, P.y, 30);
       const gl = h('div', { class: 'gbox' }, h('h5', null, h('span', { text: 'On the ground (' + ground.length + ')' })));
       ground.slice(0, 8).forEach((g) => gl.append(h('div', { class: 'list' }, h('div', { class: 'li', onclick: () => { if (DC.giveItem(g.it)) { g.alive = false; DC.audio.sfx('pickup'); DC.emit('inv'); } else DC.log('No room.', 'warn'); } }, UI.icon(g.it.id), h('div', { class: 't', text: DC.itemName(g.it) + (g.it.q > 1 ? ' x' + g.it.q : '') }), UI.btn('Pick up', () => {}, 'sm')))));
       const right = h('div', { class: 'invcol' }, nearby, ground.length ? gl : null, detailEl(e, loot));
-      const body = UI.scroll(h('div', { class: 'inv' }, loot ? right : left, loot ? left : right));
-      e.el.append(UI.panel(loot ? 'Search: ' + loot.name : 'Inventory', body, [UI.btn('Crafting', () => { UI.close('inv'); UI.open('craft'); }, 'sm'), UI.btn('Skills', () => { UI.close('inv'); UI.open('skills'); }, 'sm'), UI.btn('Done', () => UI.close('inv'), 'pri')], 'wide', () => UI.close('inv')));
+      const body = UI.scroll(tools, cats, h('div', { class: 'inv' }, loot ? right : left, loot ? left : right));
+      e.el.append(UI.panel(loot ? 'Search: ' + loot.name : 'Inventory', body, [UI.bi('hammer', 'Crafting', () => { UI.close('inv'); UI.open('craft'); }, 'sm'), UI.bi('skill', 'Skills', () => { UI.close('inv'); UI.open('skills'); }, 'sm'), UI.bi('back', 'Back', () => UI.close('inv'), 'pri')], 'wide', () => UI.close('inv')));
     },
   });
 
@@ -157,12 +204,18 @@
       const a = e.arg || {}; e.tab = e.tab || a.tab || 'craft'; const P = DC.S.player;
       const tabs = h('div', { class: 'tabs' }, [['craft', 'Craft'], ['build', 'Build']].map(([k, n]) => h('div', { class: 'tab' + (e.tab === k ? ' sel' : ''), onclick: () => { e.tab = k; craftSel = null; UI.refresh(e); } }, n)));
       const list = e.tab === 'craft' ? DC.RECIPES : DC.BUILDS;
-      const sorted = list.slice().sort((x, y) => (DC.hasRecipe(y) ? 1 : 0) - (DC.hasRecipe(x) ? 1 : 0));
+      const q = (e.cq || '').toLowerCase(), ready = (r) => DC.hasRecipe(r) && (e.tab === 'craft' ? !recipeStatus(r).length : r.mats.every(([id, n]) => DC.countItem(id) >= n));
+      const sorted = list.filter((r) => (!q || r.n.toLowerCase().includes(q)) && (!e.onlyReady || ready(r))).sort((x, y) => (ready(y) ? 1 : 0) - (ready(x) ? 1 : 0) || (DC.hasRecipe(y) ? 1 : 0) - (DC.hasRecipe(x) ? 1 : 0));
+      const filt = h('div', { class: 'tools' },
+        h('input', { type: 'search', placeholder: 'Search recipes', value: e.cq || '', oninput: (ev) => { e.cq = ev.target.value; clearTimeout(e.ft); e.ft = setTimeout(() => { UI.refresh(e); const i = e.el.querySelector('input[type=search]'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 250); } }),
+        UI.btn(e.onlyReady ? 'Ready only' : 'All recipes', () => { e.onlyReady = !e.onlyReady; UI.refresh(e); }, 'sm' + (e.onlyReady ? ' sel' : '')));
       const rows = h('div', { class: 'list' });
+      if (!sorted.length) rows.append(h('p', { class: 'dim', text: 'No matching recipes.' }));
       for (const r of sorted) {
-        const known = DC.hasRecipe(r), miss = known ? (e.tab === 'craft' ? recipeStatus(r) : r.mats.filter(([id, q]) => DC.countItem(id) < q).map(([id]) => 'Need ' + I[id].name)) : [lockText(r)];
-        const outId = e.tab === 'craft' ? r.out[0] : (r.id === 'bbed' ? 'sheet' : r.id === 'bstore' ? 'plank' : 'plank');
-        rows.append(h('div', { class: 'li' + (craftSel === r.id ? ' sel' : '') + (!known ? ' no' : ''), onclick: () => { craftSel = r.id; UI.refresh(e); } }, UI.icon(e.tab === 'craft' ? outId : (r.ground !== undefined ? 'plank' : 'plank')), h('div', { class: 't' }, h('span', { text: known ? r.n : '??? ' + r.n }), h('small', { class: miss.length ? (known ? 'red' : 'dim') : 'green', text: miss.length ? miss[0] : 'Ready' }))));
+        const known = DC.hasRecipe(r), need = e.tab === 'craft' ? r.ing : r.mats, miss = known ? (e.tab === 'craft' ? recipeStatus(r) : r.mats.filter(([id, n]) => DC.countItem(id) < n).map(([id]) => 'Need ' + I[id].name)) : [lockText(r)];
+        const outId = e.tab === 'craft' ? r.out[0] : (r.id === 'bbed' ? 'sheet' : 'plank');
+        const mats = h('div', { class: 'mats' }, known ? need.map(([id, n]) => { const have = DC.countItem(id); return h('span', { class: 'mat ' + (have >= n ? 'have' : 'miss') }, UI.icon(id, 16), have + '/' + n); }) : [h('span', { class: 'mat miss', text: '???' })]);
+        rows.append(h('div', { class: 'li recipe' + (craftSel === r.id ? ' sel' : '') + (!known ? ' no' : ''), onclick: () => { DC.audio.sfx('click'); craftSel = r.id; UI.refresh(e); } }, UI.icon(outId), h('div', { class: 't' }, h('span', { text: known ? r.n : '??? ' + r.n }), mats, h('small', { class: miss.length ? (known ? 'red' : 'dim') : 'green', text: miss.length ? miss[0] : 'Ready to make' }))));
       }
       const r = list.find((q) => q.id === craftSel), det = h('div', { class: 'detail' });
       if (!r) det.append(h('span', { class: 'dim', text: 'Select a recipe. Recipes unlock with skill levels and by finding books or notes.' }));
@@ -175,9 +228,9 @@
         det.append(h('div', { class: 'kv' }, h('span', { class: 'dim', text: 'Time' }), h('span', { text: (r.t * DC.Player.buildMul()).toFixed(1) + 's' })));
         if (e.tab === 'craft') det.append(h('div', { style: 'margin-top:8px' }, UI.btn(known ? 'Craft' : lockText(r), () => { UI.close('craft'); DC.craft(r); }, 'pri' + (known && !recipeStatus(r).length ? '' : ' off'))));
         else det.append(h('div', { style: 'margin-top:8px' }, UI.btn(known ? 'Place' : lockText(r), () => { UI.close('craft'); DC.Player.enterBuild(r); }, 'pri' + (known ? '' : ' off'))));
-        if (e.tab === 'build') det.append(h('p', { class: 'dim', text: 'Place on the grid; aim or tap to move the cursor, then hold ACT.' }));
+        if (e.tab === 'build') det.append(h('p', { class: 'dim', text: 'Place on the grid; aim or tap to move the cursor, then hold Act.' }));
       }
-      e.el.append(UI.panel(e.tab === 'craft' ? 'Crafting' : 'Building', h('div', { style: 'display:flex;flex-direction:column;min-height:0;flex:1' }, tabs, UI.scroll(rows, det)), [UI.btn('Done', () => UI.close('craft'), 'pri')], 'narrow', () => UI.close('craft')));
+      e.el.append(UI.panel(e.tab === 'craft' ? 'Crafting' : 'Building', h('div', { style: 'display:flex;flex-direction:column;min-height:0;flex:1' }, tabs, filt, UI.scroll(rows, det)), [UI.bi('back', 'Back', () => UI.close('craft'), 'pri')], 'narrow', () => UI.close('craft')));
     },
   });
 
@@ -206,7 +259,7 @@
       let c = h('div');
       if (jt.tab === 'obj') {
         const list = DC.Sys.objectiveList(), groups = {}; list.forEach((o) => (groups[o.group] = groups[o.group] || []).push(o));
-        c = h('div', null, Object.keys(groups).map((g) => h('div', null, h('h3', { text: g }), groups[g].map((o) => h('div', { class: 'kv', style: 'align-items:flex-start' }, h('span', { class: o.done ? 'green' : '', html: (o.done ? '[x] ' : '[ ] ') + o.text + (o.hint && !o.done ? '<br><span class="dim" style="font-size:10px">' + o.hint + '</span>' : '') }))))));
+        c = h('div', null, Object.keys(groups).map((g) => h('div', null, h('h3', { text: g }), groups[g].map((o) => h('div', { class: 'kv', style: 'align-items:flex-start' }, h('span', { class: o.done ? 'green' : '', html: '<i class="chk' + (o.done ? ' on' : '') + '"></i>' + o.text + (o.hint && !o.done ? '<br><span class="dim" style="font-size:10px">' + o.hint + '</span>' : '') }))))));
       } else if (jt.tab === 'places') {
         const px = P.x / T, py = P.y / T, dirs = ['E', 'SE', 'S', 'SW', 'W', 'NW', 'N', 'NE'];
         const rowOf = (name, x, y, tag) => { const dx = x - px, dy = y - py, a = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); return h('div', { class: 'kv' }, h('span', null, name, tag ? h('span', { class: 'chip', text: tag }) : null), h('span', { class: 'dim', text: Math.round(Math.hypot(dx, dy)) + 'm ' + dirs[(a + 8) % 8] })); };
@@ -235,8 +288,8 @@
     render(e) {
       const cv = DC.render.fullMap(), wrap = h('div', { class: 'mapwrap' });
       const out = document.createElement('canvas'); out.width = cv.width; out.height = cv.height; out.getContext('2d').drawImage(cv, 0, 0); wrap.append(out);
-      const body = UI.scroll(wrap, h('p', { class: 'dim', text: 'Only places you have seen are shown. Cyan is your safehouse, white is you.' }));
-      e.el.append(UI.panel('Map', body, [UI.btn('Done', () => UI.close('map'), 'pri')], 'narrow', () => UI.close('map')));
+      const body = UI.scroll(wrap, h('div', { class: 'legend' }, h('span', null, h('i', { style: 'background:#fff' }), 'You'), h('span', null, h('i', { style: 'background:#4fd0e0' }), 'Safehouse'), h('span', null, h('i', { style: 'background:#e8c050' }), 'Place'), h('span', null, h('i', { style: 'background:#e0503a' }), 'Threat'), h('span', null, h('i', { style: 'background:#6fb86f' }), 'Survivor')), h('p', { class: 'dim', text: 'Only places you have seen are shown.' }));
+      e.el.append(UI.panel('Map', body, [UI.bi('back', 'Back', () => UI.close('map'), 'pri')], 'narrow', () => UI.close('map')));
     },
   });
 })();

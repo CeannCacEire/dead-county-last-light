@@ -1,4 +1,4 @@
-/* Dead County: Last Light - original AI-generated demo. Utilities. */
+/* Dead County: Last Light - utilities. */
 (function () {
   'use strict';
   const DC = (window.DC = window.DC || {});

@@ -143,7 +143,7 @@
         P.stepAcc = 0;
         const r = Pl.stepNoise(stance, gt);
         P.noiseR = r;
-        DC.audio && DC.audio.step(gi2.snd, stance, ot === O.WINDOW);
+        DC.audio && DC.audio.step(gi2.snd, stance, ot === O.WINDOW, { g: gt, inj: P.hp < 45 || P.pain > 40 || P.limp, enc: DC.carryWeight() > DC.carryCap() * 0.85 });
         if (r > 0.5) DC.Z.noise(P.x, P.y, r, 'step');
         S.stats.dist += stepLen / T;
       }
@@ -492,7 +492,7 @@
     s.dirty = 1; W.markDirty(tx, ty);
   };
   Pl.setLock = function (tx, ty, lock) {
-    const s = W.st.get(ty * N + tx); s.locked = lock; s.dirty = 1; DC.audio.sfx('lock', tx * T, ty * T);
+    const s = W.st.get(ty * N + tx); s.locked = lock; s.dirty = 1; DC.audio.sfx(lock ? 'lock' : 'unlock', tx * T, ty * T);
     DC.log(lock ? 'Locked.' : 'Unlocked.'); W.markDirty(tx, ty);
   };
   Pl.pickLock = function (tx, ty) {

@@ -20,6 +20,7 @@
     const arr = WALLC[b.type] || WALLC.house; return arr[(b.id * 7) % arr.length];
   }
   Tl.wallColor = wallColor;
+  function bType(tx, ty) { const b = W.buildingAt(tx, ty); return b ? b.type : 'house'; }
   function shade(col, f) { const n = parseInt(col.slice(1), 16); const r = Math.max(0, Math.min(255, ((n >> 16) & 255) * f)) | 0, g = Math.max(0, Math.min(255, ((n >> 8) & 255) * f)) | 0, b = Math.max(0, Math.min(255, (n & 255) * f)) | 0; return 'rgb(' + r + ',' + g + ',' + b + ')'; }
   Tl.shade = shade;
 
@@ -157,15 +158,15 @@
   function drawObj(c, t, tx, ty, x, y, i) {
     const h = hash(tx, ty, 5);
     switch (t) {
-      case O.WALL: drawWall(c, tx, ty, x, y, wallColor(tx, ty)); break;
-      case O.BWALL: drawWall(c, tx, ty, x, y, '#7e5e3c'); for (let k = 0; k < 4; k++) rect(c, x, y + k * 4, T, 1, '#5a4228'); break;
-      case O.DOOR: drawDoor(c, tx, ty, x, y, i, wallColor(tx, ty)); break;
-      case O.BGATE: drawDoor(c, tx, ty, x, y, i, '#7e5e3c'); break;
-      case O.WINDOW: drawWindow(c, tx, ty, x, y, i, wallColor(tx, ty)); break;
-      case O.TREE: drawTreeBase(c, x, y, h); break;
-      case O.FENCE: drawFence(c, tx, ty, x, y); break;
-      case O.BUSH: c.fillStyle = '#2f4a2a'; c.beginPath(); c.arc(x + 8, y + 9, 6, 0, 6.3); c.fill(); c.fillStyle = '#3e6034'; c.beginPath(); c.arc(x + 6, y + 7, 4, 0, 6.3); c.fill(); if (h > 0.7) rect(c, x + 10, y + 7, 2, 2, '#a83a4a'); break;
-      case O.ROCK: rect(c, x + 2, y + 6, 12, 8, '#6a6a68'); rect(c, x + 4, y + 4, 8, 4, '#7a7a76'); rect(c, x + 5, y + 5, 3, 1, '#9a9a94'); rect(c, x + 2, y + 12, 12, 2, '#4a4a48'); break;
+      case O.WALL: DC.art.wall(c, tx, ty, x, y, wallColor(tx, ty), bType(tx, ty)); break;
+      case O.BWALL: DC.art.wall(c, tx, ty, x, y, '#7e5e3c', 'cabin', true); break;
+      case O.DOOR: DC.art.door(c, tx, ty, x, y, W.st.get(i), isHoriz(tx, ty), wallColor(tx, ty), bType(tx, ty)); break;
+      case O.BGATE: DC.art.door(c, tx, ty, x, y, W.st.get(i), isHoriz(tx, ty), '#7e5e3c', 'cabin'); break;
+      case O.WINDOW: DC.art.window(c, tx, ty, x, y, W.st.get(i), isHoriz(tx, ty), wallColor(tx, ty), bType(tx, ty)); break;
+      case O.TREE: DC.art.treeBase(c, x, y, tx, ty); break;
+      case O.FENCE: DC.art.fence(c, tx, ty, x, y); break;
+      case O.BUSH: DC.art.bush(c, x, y, tx, ty); break;
+      case O.ROCK: DC.art.rock(c, x, y, tx, ty); break;
       case O.BED: case O.BBED: rect(c, x + 1, y + 1, 14, 14, '#4a3626'); rect(c, x + 2, y + 2, 12, 12, t === O.BED ? '#6a4a52' : '#52606a'); rect(c, x + 2, y + 2, 12, 4, '#d8d4c8'); rect(c, x + 3, y + 3, 4, 2, '#fff'); rect(c, x + 2, y + 7, 12, 1, 'rgba(0,0,0,.25)'); break;
       case O.HBED: rect(c, x + 1, y + 1, 14, 14, '#7a8088'); rect(c, x + 2, y + 2, 12, 12, '#cfd8dc'); rect(c, x + 3, y + 3, 5, 3, '#fff'); rect(c, x + 2, y + 8, 12, 5, '#7ea2b4'); break;
       case O.COUCH: rect(c, x + 1, y + 2, 14, 12, '#4a4034'); rect(c, x + 2, y + 6, 12, 7, '#6a5c48'); rect(c, x + 2, y + 3, 12, 3, '#54483a'); rect(c, x + 2, y + 8, 6, 1, 'rgba(0,0,0,.25)'); break;
@@ -208,38 +209,39 @@
   const chunks = (Tl.chunks = new Map());
   function mkCanvas(w, h) { const cv = document.createElement('canvas'); cv.width = w; cv.height = h; return cv; }
   function bake(cx, cy) {
-    const key = cy * NC + cx;
+    const key = cy * NC + cx, A = DC.art, Q = DC.gfx, cfg = Q.cfg, bs = cfg.bake, sz = Math.ceil((CH * T + PAD * 2) * bs);
     let ch = chunks.get(key);
-    if (!ch) { ch = { base: mkCanvas(CH * T + PAD * 2, CH * T + PAD * 2), over: null, ver: -1, cx, cy }; chunks.set(key, ch); }
-    const c = ch.base.getContext('2d'); c.clearRect(0, 0, ch.base.width, ch.base.height);
+    if (!ch || ch.base.width !== sz) { ch = { base: mkCanvas(sz, sz), over: null, ver: -1, cx, cy, bs }; chunks.set(key, ch); }
+    const c = ch.base.getContext('2d'); c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, sz, sz); c.setTransform(bs, 0, 0, bs, 0, 0);
     const x0 = cx * CH - 1, y0 = cy * CH - 1, x1 = cx * CH + CH, y1 = cy * CH + CH;
-    const ox = cx * CH * T - PAD, oy = cy * CH * T - PAD;
-    // ground
+    const ox = cx * CH * T - PAD, oy = cy * CH * T - PAD, ok = (tx, ty) => tx >= 0 && ty >= 0 && tx < N && ty < N;
+    // ground, blended edges, decals
     for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-      if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
-      const i = ty * N + tx; const px = tx * T - ox, py = ty * T - oy;
-      drawGround(c, W.g[i], tx, ty, px, py); drawShore(c, tx, ty, px, py);
+      if (!ok(tx, ty)) continue; const gt = W.g[ty * N + tx], px = tx * T - ox, py = ty * T - oy;
+      A.ground(c, gt, tx, ty, px, py); A.edges(c, gt, tx, ty, px, py); if (cfg.decor > 0) A.decor(c, gt, tx, ty, px, py, cfg.decor);
     }
-    // soft shadows from walls/objects
-    for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-      if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
-      const t = W.o[ty * N + tx]; if (!t) continue;
-      const px = tx * T - ox, py = ty * T - oy;
-      if (t === O.WALL || t === O.BWALL || t === O.DOOR || t === O.WINDOW) { if (!wallish(tx, ty + 1)) { c.fillStyle = 'rgba(0,0,0,.28)'; c.fillRect(px, py + T, T, 4); } }
-      else if (t === O.FENCE || t === O.LAMP) { c.fillStyle = 'rgba(0,0,0,.16)'; c.fillRect(px + 1, py + 13, T, 2); }
+    // building and object shadows
+    if (cfg.shadow > 0) for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
+      if (!ok(tx, ty)) continue; const t = W.o[ty * N + tx]; if (!t) continue; const px = tx * T - ox, py = ty * T - oy;
+      if (t === O.WALL || t === O.BWALL || t === O.DOOR || t === O.WINDOW) {
+        if (!wallish(tx, ty + 1)) { const g = c.createLinearGradient(0, py + T, 0, py + T + 7); g.addColorStop(0, 'rgba(0,0,0,.42)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px, py + T, T + 3, 7); }
+        if (!wallish(tx + 1, ty) && !W.isIndoor(tx + 1, ty)) { const g = c.createLinearGradient(px + T, 0, px + T + 6, 0); g.addColorStop(0, 'rgba(0,0,0,.3)'); g.addColorStop(1, 'rgba(0,0,0,0)'); c.fillStyle = g; c.fillRect(px + T, py + 3, 6, T + 4); }
+      } else if (t === O.LAMP) { Q.soft(c, px + 9, py + 14, 4, 2, 0.4); }
     }
     let hasTrees = false;
     for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) {
-      if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue;
+      if (!ok(tx, ty)) continue;
       const i = ty * N + tx, t = W.o[i]; if (!t || t === O.CAR) continue;
       if (t === O.TREE) hasTrees = true;
-      drawObj(c, t, tx, ty, tx * T - ox, ty * T - oy, i);
+      const px = tx * T - ox, py = ty * T - oy;
+      if (cfg.shadow > 0) A.contact(c, t, px, py);
+      if (!A.NO_POLISH.has(t)) A.polish(c, bs, px, py, (tc, ax, ay) => drawObj(tc, t, tx, ty, ax, ay, i)); else drawObj(c, t, tx, ty, px, py, i);
     }
-    for (const car of W.cars) { if (car.x >= x0 - 3 && car.x <= x1 && car.y >= y0 - 3 && car.y <= y1) drawCar(c, car, ox, oy); }
+    for (const car of W.cars) { if (car.x >= x0 - 3 && car.x <= x1 && car.y >= y0 - 3 && car.y <= y1) A.car(c, car, ox, oy); }
     if (hasTrees) {
-      if (!ch.over) ch.over = mkCanvas(CH * T + PAD * 2, CH * T + PAD * 2);
-      const oc = ch.over.getContext('2d'); oc.clearRect(0, 0, ch.over.width, ch.over.height);
-      for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) { if (tx < 0 || ty < 0 || tx >= N || ty >= N) continue; if (W.o[ty * N + tx] === O.TREE) drawCanopy(oc, tx * T - ox, ty * T - oy, tx, ty); }
+      if (!ch.over || ch.over.width !== sz) ch.over = mkCanvas(sz, sz);
+      const oc = ch.over.getContext('2d'); oc.setTransform(1, 0, 0, 1, 0, 0); oc.clearRect(0, 0, sz, sz); oc.setTransform(bs, 0, 0, bs, 0, 0);
+      for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) { if (!ok(tx, ty)) continue; if (W.o[ty * N + tx] === O.TREE) A.canopy(oc, tx * T - ox, ty * T - oy, tx, ty); }
     } else ch.over = null;
     ch.ver = W.ver[key];
     return ch;
@@ -253,6 +255,6 @@
   Tl.unloadFar = function (pcx, pcy, r) {
     for (const [k, ch] of chunks) if (Math.abs(ch.cx - pcx) > r || Math.abs(ch.cy - pcy) > r) chunks.delete(k);
   };
-  Tl.PAD = PAD;
+  Tl.PAD = PAD; Tl.clear = function () { chunks.clear(); };
   Tl.drawGround = drawGround; Tl.CARCOL = CARCOL;
 })();

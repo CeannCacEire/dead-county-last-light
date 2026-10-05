@@ -1,4 +1,4 @@
-/* Dead County: Last Light - zombie AI: states, senses, noise, flow fields, hordes, pooling. */
+/* Dead County: Last Light - zombie behaviour: states, senses, noise, flow fields, hordes, pooling. */
 (function () {
   'use strict';
   const DC = window.DC, W = DC.W, O = DC.O, G = DC.G, T = 16, N = W.N;
@@ -343,7 +343,7 @@
       manageSpawns();
     }
     const sightMul = P.sightMul;
-    for (const z of Z.active) { ai(z, P, dt, sightMul); if (z.alive) DC.tripCheck(z.x, z.y, false); }
+    for (const z of Z.active) { think(z, P, dt, sightMul); if (z.alive) DC.tripCheck(z.x, z.y, false); }
     // separation
     for (let a = 0; a < Z.active.length; a++) {
       const za = Z.active[a];
@@ -372,7 +372,7 @@
     }
   }
 
-  function ai(z, P, dt, sightMul) {
+  function think(z, P, dt, sightMul) {
     const S = DC.S, tp = Z.TYPES[z.type];
     z.anim += dt; z.flash = Math.max(0, z.flash - dt);
     if (z.stun > 0) { z.stun -= dt; return; }

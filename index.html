@@ -3,46 +3,64 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0b0d0c">
+<meta name="theme-color" content="#0a0d0e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="description" content="Dead County: Last Light - an original AI-generated top-down zombie survival demo. Plays in the browser, no install.">
-<title>Dead County: Last Light - original AI-generated demo</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0d0c'/%3E%3Crect x='6' y='3' width='4' height='10' fill='%23d9a441'/%3E%3C/svg%3E">
+<meta name="apple-mobile-web-app-title" content="Dead County">
+<meta name="description" content="Dead County: Last Light - a top-down survival horror game. Scavenge, build, and endure in a fallen county. Plays in your browser on phone and desktop.">
+<meta property="og:title" content="Dead County: Last Light">
+<meta property="og:description" content="Top-down survival horror. Scavenge, build, and endure in a fallen county.">
+<meta property="og:type" content="website">
+<title>Dead County: Last Light</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0d0e'/%3E%3Cpath d='M16 5c4 5 6 8 6 12a6 6 0 0 1-12 0c0-4 2-7 6-12z' fill='%23e0a84a'/%3E%3Crect x='14' y='20' width='4' height='7' fill='%23e0a84a'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 <div id="app">
   <canvas id="game"></canvas>
+  <canvas id="titlecv" class="hidden"></canvas>
 
   <div id="hud" class="hidden">
-    <div id="bars"></div>
-    <div id="status"></div>
+    <div id="hud-tl">
+      <div id="bars"></div>
+      <div id="status"></div>
+      <div id="objective" class="hidden"><span class="ico"></span><span id="obj-text"></span></div>
+      <div id="threat" class="hidden"><span class="ico"></span><span id="threat-n"></span></div>
+    </div>
     <div id="topright">
-      <div id="clock"></div>
-      <canvas id="minimap" width="80" height="80"></canvas>
-      <div id="meters"><div class="m" id="m-noise"><i></i><span>NOISE</span></div><div class="m" id="m-vis"><i></i><span>SEEN</span></div></div>
+      <div id="clockbox"><div id="clock"></div></div>
+      <div id="mapbox"><canvas id="minimap" width="80" height="80"></canvas><div id="compass" aria-hidden="true"></div></div>
+      <div id="meters">
+        <div class="m" id="m-noise" title="Noise"><i></i><span></span></div>
+        <div class="m" id="m-vis" title="Detection"><i></i><span></span></div>
+        <div class="m" id="m-wt" title="Carry weight"><i></i><span></span></div>
+      </div>
     </div>
     <div id="toasts"></div>
     <div id="prompt" class="hidden"><span id="prompt-text"></span><div id="prompt-bar"><i></i></div></div>
     <div id="buildbar" class="hidden"></div>
-    <pre id="debug" class="hidden"></pre>
+    <pre id="perf" class="hidden"></pre>
   </div>
 
   <div id="controls" class="hidden">
     <div id="c-joy" class="ctl"><div class="base"></div><div class="knob"></div></div>
     <div id="c-hot" class="ctl"></div>
-    <div id="c-act" class="ctl btn" role="button" aria-label="Action"><b>ACT</b><small></small></div>
-    <div id="c-atk" class="ctl btn" role="button" aria-label="Attack"><b>HIT</b></div>
-    <div id="c-int" class="ctl btn" role="button" aria-label="Interact menu"><b>USE</b></div>
-    <div id="c-spr" class="ctl btn" role="button" aria-label="Sprint"><b>RUN</b></div>
-    <div id="c-crc" class="ctl btn" role="button" aria-label="Crouch"><b>SNK</b></div>
-    <div id="c-inv" class="ctl btn" role="button" aria-label="Inventory"><b>BAG</b></div>
+    <div id="c-act" class="ctl btn" role="button" aria-label="Action"><span class="ico" data-i="hand"></span><b>Act</b><small></small></div>
+    <div id="c-atk" class="ctl btn" role="button" aria-label="Attack"><span class="ico" data-i="sword"></span><b class="lb">Attack</b></div>
+    <div id="c-int" class="ctl btn" role="button" aria-label="Interact and search"><span class="ico" data-i="search"></span><b class="lb">Search</b></div>
+    <div id="c-spr" class="ctl btn" role="button" aria-label="Sprint"><span class="ico" data-i="sprint"></span><b class="lb">Sprint</b></div>
+    <div id="c-crc" class="ctl btn" role="button" aria-label="Crouch"><span class="ico" data-i="crouch"></span><b class="lb">Crouch</b></div>
+    <div id="c-inv" class="ctl btn sm" role="button" aria-label="Inventory"><span class="ico" data-i="bag"></span><b class="lb">Pack</b></div>
+    <div id="c-map" class="ctl btn sm" role="button" aria-label="Map"><span class="ico" data-i="map"></span><b class="lb">Map</b></div>
+    <div id="c-jrn" class="ctl btn sm" role="button" aria-label="Journal"><span class="ico" data-i="book"></span><b class="lb">Journal</b></div>
+    <div id="c-fl" class="ctl btn sm" role="button" aria-label="Flashlight"><span class="ico" data-i="flash"></span><b class="lb">Light</b></div>
+    <div id="c-heal" class="ctl btn sm" role="button" aria-label="Quick heal"><span class="ico" data-i="plus"></span><b class="lb">Heal</b></div>
+    <div id="c-pse" class="ctl btn sm" role="button" aria-label="Pause"><span class="ico" data-i="pause"></span><b class="lb">Pause</b></div>
   </div>
 
   <div id="screens"></div>
-  <div id="demo-tag">ORIGINAL AI-GENERATED DEMO</div>
-  <noscript><div style="position:fixed;inset:0;background:#0b0d0c;color:#d9a441;padding:2em;font-family:monospace">Dead County: Last Light needs JavaScript enabled.</div></noscript>
+  <div id="fade"></div>
+  <noscript><div style="position:fixed;inset:0;background:#0a0d0e;color:#e0a84a;padding:2em;font-family:sans-serif">Dead County: Last Light needs JavaScript enabled.</div></noscript>
 </div>
 
 <script src="js/util.js"></script>
@@ -54,12 +72,17 @@
 <script src="js/life.js"></script>
 <script src="js/systems.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/uiicons.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/sprites.js"></script>
+<script src="js/art.js"></script>
 <script src="js/tiles.js"></script>
 <script src="js/render.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/input.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/inventory_ui.js"></script>
+<script src="js/title.js"></script>
 <script src="js/save.js"></script>
 <script src="js/main.js"></script>
 </body>

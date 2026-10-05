@@ -38,6 +38,8 @@
     chip(c, a, b) { c.fillStyle = a; c.fillRect(2, 3, 12, 10); c.fillStyle = b; c.fillRect(5, 5, 6, 6); c.fillRect(1, 5, 1, 1); c.fillRect(1, 9, 1, 1); c.fillRect(14, 5, 1, 1); c.fillRect(14, 9, 1, 1); },
     clock(c, a, b) { c.fillStyle = b; c.fillRect(3, 3, 10, 10); c.fillStyle = a; c.fillRect(4, 4, 8, 8); c.fillStyle = '#222'; c.fillRect(8, 5, 1, 4); c.fillRect(8, 8, 3, 1); c.fillStyle = b; c.fillRect(2, 2, 3, 2); c.fillRect(11, 2, 3, 2); },
     book(c, a, b) { c.fillStyle = a; c.fillRect(3, 2, 10, 12); c.fillStyle = b; c.fillRect(4, 3, 8, 3); c.fillRect(4, 12, 8, 1); c.fillStyle = 'rgba(0,0,0,.3)'; c.fillRect(3, 2, 2, 12); },
+    glove(c, a, b) { c.fillStyle = a; c.fillRect(5, 7, 7, 7); c.fillRect(5, 3, 2, 5); c.fillRect(7, 2, 2, 6); c.fillRect(9, 3, 2, 5); c.fillRect(11, 5, 2, 4); c.fillRect(3, 8, 3, 3); c.fillStyle = b; c.fillRect(5, 12, 7, 2); },
+    scarf(c, a, b) { c.fillStyle = a; c.fillRect(3, 4, 10, 4); c.fillRect(9, 8, 3, 6); c.fillStyle = b; c.fillRect(3, 6, 10, 1); c.fillRect(9, 11, 3, 1); c.fillRect(9, 13, 3, 1); },
     hat(c, a, b) { c.fillStyle = a; c.fillRect(3, 5, 10, 6); c.fillStyle = b; c.fillRect(2, 10, 12, 2); c.fillRect(5, 4, 6, 1); },
     shirt(c, a, b) { c.fillStyle = a; c.fillRect(1, 3, 14, 4); c.fillRect(4, 3, 8, 11); c.fillStyle = b; c.fillRect(6, 3, 4, 2); c.fillRect(4, 12, 8, 2); },
     pants(c, a, b) { c.fillStyle = a; c.fillRect(3, 2, 10, 4); c.fillRect(3, 5, 4, 9); c.fillRect(9, 5, 4, 9); c.fillStyle = b; c.fillRect(3, 2, 10, 1); c.fillRect(7, 5, 2, 3); },
@@ -48,11 +50,27 @@
     gun(c, a, b) { c.fillStyle = a; c.fillRect(1, 4, 12, 4); c.fillStyle = b; c.fillRect(3, 8, 4, 5); c.fillRect(1, 3, 3, 1); },
     bullet(c, a, b) { c.fillStyle = a; c.fillRect(6, 3, 4, 9); c.fillStyle = b; c.fillRect(7, 1, 2, 3); c.fillRect(5, 11, 6, 2); },
   };
+  // 16px art is upscaled, outlined and shaded so every item reads clearly at touch sizes
+  const SZ = 36;
+  let tmp = null;
   DC.iconCanvas = function (id) {
     if (cache[id]) return cache[id];
-    const d = DC.ITEMS[id], cv = document.createElement('canvas'); cv.width = cv.height = 16;
-    const c = cv.getContext('2d'); const [shape, a, b] = d.ic;
-    (S[shape] || S.box)(c, a, b);
+    const d = DC.ITEMS[id], cv = document.createElement('canvas'); cv.width = cv.height = SZ;
+    if (!tmp) { tmp = document.createElement('canvas'); tmp.width = tmp.height = 16; }
+    const tc = tmp.getContext('2d'); tc.clearRect(0, 0, 16, 16); const [shape, a, b] = d.ic;
+    (S[shape] || S.box)(tc, a, b);
+    const c = cv.getContext('2d'); c.imageSmoothingEnabled = false;
+    // soft ground shadow
+    c.fillStyle = 'rgba(0,0,0,.28)'; c.beginPath(); c.ellipse(SZ / 2 + 1, SZ - 5, 12, 3.4, 0, 0, 6.28); c.fill();
+    // silhouette outline
+    const sil = document.createElement('canvas'); sil.width = sil.height = SZ; const sc = sil.getContext('2d'); sc.imageSmoothingEnabled = false;
+    sc.drawImage(tmp, 2, 1, 32, 32); sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#0b0d0e'; sc.fillRect(0, 0, SZ, SZ);
+    for (const [dx, dy] of [[-1.4, 0], [1.4, 0], [0, -1.4], [0, 1.4], [-1, -1], [1, 1], [-1, 1], [1, -1]]) c.drawImage(sil, dx, dy);
+    c.drawImage(tmp, 2, 1, 32, 32);
+    // light from the upper left, shade lower right (clipped to the item's own pixels)
+    c.globalCompositeOperation = 'source-atop';
+    const g = c.createLinearGradient(2, 1, SZ - 2, SZ - 2); g.addColorStop(0, 'rgba(255,255,255,.26)'); g.addColorStop(0.5, 'rgba(255,255,255,0)'); g.addColorStop(1, 'rgba(0,0,0,.3)');
+    c.fillStyle = g; c.fillRect(0, 0, SZ, SZ); c.globalCompositeOperation = 'source-over';
     cache[id] = cv; return cv;
   };
   DC.iconURL = function (id) {

@@ -1,4 +1,4 @@
-/* Dead County: Last Light - browser-storage save/load (versioned). The world is regenerated from the seed; only changes are stored. */
+/* Dead County: Last Light - browser-storage save/load (versioned). The world is rebuilt from the seed; only changes are stored. */
 (function () {
   'use strict';
   const DC = window.DC, W = DC.W, N = W.N, Save = (DC.Save = {});

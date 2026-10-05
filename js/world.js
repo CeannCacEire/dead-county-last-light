@@ -1,4 +1,4 @@
-/* Dead County: Last Light - world data, procedural generation, collision, line of sight. */
+/* Dead County: Last Light - world data, procedural layout, collision, line of sight. */
 (function () {
   'use strict';
   const DC = window.DC, G = DC.G, O = DC.O, OD = DC.OD;
@@ -18,7 +18,7 @@
     W.diff = new Map(); W.ver = new Uint16Array(NC * NC); W.houses = []; W.lamps = []; W.genDone = false;
     W.pois = []; W.pads = null; W.mast = null; W.gate = null; W.spawnAreas = [];
     res = new Uint8Array(N * N);
-    generate();
+    buildWorld();
     W.genDone = true;
   };
 
@@ -130,7 +130,7 @@
     }
   }
 
-  // ---------- building generators ----------
+  // ---------- building layouts ----------
   function house(x, y, w, h, side, opt) {
     opt = opt || {};
     const b = mkB('house', x, y, w, h, { name: opt.name || 'House', fl: G.WOOD, roof: DC.pick(['#5a4640', '#4a4f56', '#5e5446', '#3f4a40', '#56423c'], R) });
@@ -302,8 +302,8 @@
     return true;
   }
 
-  // ---------- master generation ----------
-  function generate() {
+  // ---------- master layout ----------
+  function buildWorld() {
     // base ground
     for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
       const i = y * N + x;

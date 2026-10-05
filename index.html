@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0d0c">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Dead County: Last Light - an original AI-generated top-down zombie survival demo. Plays in the browser, no install.">
+<title>Dead County: Last Light - original AI-generated demo</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0d0c'/%3E%3Crect x='6' y='3' width='4' height='10' fill='%23d9a441'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+  <canvas id="game"></canvas>
+
+  <div id="hud" class="hidden">
+    <div id="bars"></div>
+    <div id="status"></div>
+    <div id="topright">
+      <div id="clock"></div>
+      <canvas id="minimap" width="80" height="80"></canvas>
+      <div id="meters"><div class="m" id="m-noise"><i></i><span>NOISE</span></div><div class="m" id="m-vis"><i></i><span>SEEN</span></div></div>
+    </div>
+    <div id="toasts"></div>
+    <div id="prompt" class="hidden"><span id="prompt-text"></span><div id="prompt-bar"><i></i></div></div>
+    <div id="buildbar" class="hidden"></div>
+    <pre id="debug" class="hidden"></pre>
+  </div>
+
+  <div id="controls" class="hidden">
+    <div id="c-joy" class="ctl"><div class="base"></div><div class="knob"></div></div>
+    <div id="c-hot" class="ctl"></div>
+    <div id="c-act" class="ctl btn" role="button" aria-label="Action"><b>ACT</b><small></small></div>
+    <div id="c-atk" class="ctl btn" role="button" aria-label="Attack"><b>HIT</b></div>
+    <div id="c-int" class="ctl btn" role="button" aria-label="Interact menu"><b>USE</b></div>
+    <div id="c-spr" class="ctl btn" role="button" aria-label="Sprint"><b>RUN</b></div>
+    <div id="c-crc" class="ctl btn" role="button" aria-label="Crouch"><b>SNK</b></div>
+    <div id="c-inv" class="ctl btn" role="button" aria-label="Inventory"><b>BAG</b></div>
+  </div>
+
+  <div id="screens"></div>
+  <div id="demo-tag">ORIGINAL AI-GENERATED DEMO</div>
+  <noscript><div style="position:fixed;inset:0;background:#0b0d0c;color:#d9a441;padding:2em;font-family:monospace">Dead County: Last Light needs JavaScript enabled.</div></noscript>
+</div>
+
+<script src="js/util.js"></script>
+<script src="js/data.js"></script>
+<script src="js/world.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/zombies.js"></script>
+<script src="js/player.js"></script>
+<script src="js/life.js"></script>
+<script src="js/systems.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/tiles.js"></script>
+<script src="js/render.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/input.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/inventory_ui.js"></script>
+<script src="js/save.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
